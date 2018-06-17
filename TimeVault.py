@@ -1,5 +1,5 @@
 # A music, activity, and weather diary.
-# The GUI is mostly superfluous.
+# The GUI is mostly superfluous, it would have been cleaner to just use the terminal as an interface.
 
 import requests  # internet connection
 from bs4 import BeautifulSoup  # scraping html information
