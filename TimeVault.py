@@ -1,5 +1,5 @@
-# A script to record data describing the current day.
-# Current recorded values: Date, weather, CAD to USD.
+# A music, activity, and weather diary.
+# The GUI is mostly superfluous.
 
 import requests  # internet connection
 from bs4 import BeautifulSoup  # scraping html information
@@ -9,18 +9,15 @@ import sqlite3  # table entries
 import pandas as pd  # printing an attractive table
 import tabulate as tab  # printing an attractive table
 
-
-# CAD Dollar
-def get_CAD_to_USD():
-    html = requests.get("https://www.bankofcanada.ca/")
-    soup = BeautifulSoup(html.content, "html.parser")
-    cad_html = soup.get_text()
-    cad_var = cad_html[ cad_html.index("titlesHomepageChart") : cad_html.index("subTitlesHomepageChart") ]
-    cad_json = cad_var.replace("titlesHomepageChart = ", "").replace(";", "")
-    cad_json = json.loads(cad_json)
-    # print("Currency:\n" + cad_json['USD'] + "\n")
-    # cad = cad_json['USD'].replace("1 CAD = ", "").replace(" USD", "")
-    return cad_json['USD']
+# kivy GUI imports
+import kivy
+from kivy.app import App
+from kivy.uix.button import Button
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.config import Config
+from kivy.uix.floatlayout import FloatLayout
 
 
 # Weather
@@ -33,43 +30,98 @@ def get_weather():
     weatherFEELS = soup.find("span", classname="deg-feels").get_text()
 
     # print("City weather:\n" + weatherTEMP + " feels like " + weatherFEELS + "\n")
-    return weatherTEMP + ", feels like " + weatherFEELS
+    return weatherTEMP # + ", feels like " + weatherFEELS
 
 
 # Print db table
-def print_db_table():
-    df = pd.read_sql("SELECT * FROM TimeVault", conn)
-    print(tab.tabulate(df, headers=["Date", "Weather", "CAD to USD"],
+def print_db_table(conn):
+    df = pd.read_sql("SELECT * FROM Personal", conn)
+    print(tab.tabulate(df, headers=["Date", "Artist", "Track", "Event", "Weather"],
                             tablefmt='grid',
                             showindex=False) )
 
+# SQL table processes
+def main(artist, track, event):
 
-# Table entry data:
-cad = get_CAD_to_USD()
-date = time.strftime("%b %d, %Y")
-weather = get_weather()
+    # Table entry data:
+    date = time.strftime("%b %d, %Y")
+    weather = get_weather()
+
+    print(date, artist, track, event, weather)
+
+    # Table entry process:
+    conn = sqlite3.connect('Personal.db')
+    c = conn.cursor()
+
+    # If table hasn't already been created, create one:
+    c.execute("CREATE TABLE IF NOT EXISTS Personal (date, Artist, Track, Event, Weather)")
+
+    # Save new scraped data if it's a new day:
+    try:
+        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS MyUniqueIndexName ON Personal (date)')
+        c.execute('INSERT INTO Personal VALUES (?,?,?,?,?)', (date, artist, track, event, weather))
+    except sqlite3.IntegrityError:
+        print("Daily entry already in table.")
+
+    # Print db table:
+    print_db_table(conn)
+
+    # Save and exit:
+    conn.commit()
+    conn.close()
 
 
-# Table entry process:
-conn = sqlite3.connect('TimeVault.db')
-c = conn.cursor()
+class MyApp(App):
+    
+    # button click function
+    def buttonClicked(self,btn):
+        artist = self.txt0.text
+        track = self.txt1.text
+        event = self.txt2.text
+
+        if btn.text == 'Enter':
+            btn.text = "Place in Table"
+            main(str(artist), str(track), str(event))
+        elif btn.text == 'Place in Table':
+            btn.text = 'Entry Successful'
+
+    # layout
+    def build(self):
+        layout = BoxLayout(orientation='vertical')
+
+        root = FloatLayout()
+
+        # label variables
+        x = 1.
+        y = .4
+
+        self.lbl0 = Label(text="Artist of the day:", bold='true', font_size=18, size_hint=(x, y))
+        layout.add_widget(self.lbl0)
+        self.txt0 = TextInput(text='', multiline=False, size_hint_y=None, height=40)
+        layout.add_widget(self.txt0)
+
+        self.lbl1 = Label(text="Track of the day:", bold='true', font_size=18, size_hint=(x, y))
+        layout.add_widget(self.lbl1)
+        self.txt1 = TextInput(text='', multiline=False, size_hint_y=None, height=40)
+        layout.add_widget(self.txt1)
+
+        self.lbl2 = Label(text="Activity of the day:", bold='true', font_size=18, size_hint=(x, y))
+        layout.add_widget(self.lbl2)
+        self.txt2 = TextInput(text='', multiline=False, size_hint_y=None, height=40)
+        layout.add_widget(self.txt2)
+
+        btn1 = Button(text="Enter")
+        btn1.bind(on_press=self.buttonClicked)
+
+        layout.add_widget(btn1)
+        root.add_widget(layout)
+
+        return root
 
 
-# If table hasn't already been created, create one:
-c.execute("CREATE TABLE IF NOT EXISTS TimeVault (Date, Weather, CADtoUSD)")
 
-
-# Save new scraped data if it's a new day:
-try:
-    c.execute('CREATE UNIQUE INDEX IF NOT EXISTS MyUniqueIndexName ON TimeVault (date)')
-    c.execute('INSERT INTO TimeVault VALUES (?,?,?)', (date, weather, cad))
-except sqlite3.IntegrityError:
-    print("Daily entry already in table.")
-
-
-# Print db table:
-print_db_table()
-
-# Save and exit:
-conn.commit()
-conn.close()
+# run app
+if __name__ == "__main__":
+    Config.set('graphics', 'width', '300')
+    Config.set('graphics', 'height', '400')
+    MyApp().run()
