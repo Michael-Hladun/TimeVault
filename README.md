@@ -1,4 +1,4 @@
 # TimeVault
-Records a series of characteristics describing the present day from a historical standpoint.
+Records a series of characteristics describing your day.
 
-Currently recorded values: Date, Weather, CAD to USD
+Music, Activity, and Weather Diary.
