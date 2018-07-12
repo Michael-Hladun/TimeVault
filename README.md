@@ -1,4 +1,3 @@
-# TimeVault
-Records a series of characteristics describing your day.
+# MusicLog
 
-Music, Activity, and Weather log.
+Log an artist, song, and activity in a table via a GUI.
